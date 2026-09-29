@@ -8,3 +8,13 @@ select = [
     "SIM",
     "I",
 ]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+addopts = ["--strict-markers"]
+markers = [
+    "perf: performance/benchmark tests (see PLAN.md, section 6); excluded from `make unit_test`, run alone via `make perf_test`.",
+]
+
+[tool.coverage.run]
+source = ["triangulator"]
