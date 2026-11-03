@@ -1,24 +1,12 @@
-"""Récupère des PointSets depuis le service HTTP PointSetManager."""
-
-from triangulator.point_set import PointSet
+"""Récupère un PointSet auprès du service PointSetManager, en HTTP."""
 
 
-class PointSetNotFoundError(Exception):
-    """Levée quand le PointSetManager n'a pas de PointSet pour l'id demandé."""
+def fetch_point_set(
+    base_url: str, point_set_id: str, timeout: float = 5.0
+) -> tuple[int, bytes]:
+    """Appelle GET {base_url}/pointset/{point_set_id}.
 
-
-class PointSetManagerUnavailableError(Exception):
-    """Levée quand le PointSetManager est injoignable ou échoue de façon inattendue."""
-
-
-class PointSetManagerClient:
-    """Client pour l'API HTTP du PointSetManager."""
-
-    def __init__(self, base_url: str, timeout: float = 5.0) -> None:
-        """Configure l'URL de base du PointSetManager et le timeout par requête."""
-        self.base_url = base_url
-        self.timeout = timeout
-
-    def get_point_set(self, point_set_id: str) -> PointSet:
-        """Récupère et décode le PointSet identifié par point_set_id."""
-        raise NotImplementedError
+    Renvoie (code_http, corps), y compris pour un code d'erreur (404,
+    500...). Lève OSError si le service est injoignable ou trop lent.
+    """
+    raise NotImplementedError

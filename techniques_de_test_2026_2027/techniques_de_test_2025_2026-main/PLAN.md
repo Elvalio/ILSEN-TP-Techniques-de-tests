@@ -59,7 +59,7 @@ Vocabulaire des exceptions/codes utilisé dans tout le document :
 | Carré | 4 points formant un carré | Exactement 2 triangles couvrant le carré |
 | Pas assez de points | 0, 1 ou 2 points | Lève `TriangulationError` (pas de résultat inventé) |
 | Points alignés | 3+ points colinéaires | Lève `TriangulationError` (aucun triangle valide possible) |
-| Points dupliqués | Deux points avec les mêmes coordonnées | Comportement géré sans planter (ignoré ou erreur, à trancher) |
+| Points dupliqués | Deux points avec les mêmes coordonnées | Lève `TriangulationError` : un point en double produirait un triangle d'aire nulle |
 | Indices valides | N'importe quel résultat non trivial | Chaque indice utilisé dans un triangle existe bien dans le `PointSet` d'entrée |
 
 ## 4. Client `PointSetManager`

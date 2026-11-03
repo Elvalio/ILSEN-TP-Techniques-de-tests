@@ -1,30 +1,18 @@
-"""Représente un ensemble ordonné de points 2D, encodable en binaire.
+"""Encode/décode le format binaire PointSet (voir PLAN.md, section 1).
 
 Format binaire :
 - 4 octets (unsigned long, little-endian) : nombre de points N.
-- N * 8 octets : les points, chacun sous forme de 2 floats little-endian (X puis Y).
+- N * 8 octets : les points, chacun sous forme de 2 floats (X puis Y).
 """
 
-from __future__ import annotations
-
-from dataclasses import dataclass
+Point = tuple[float, float]
 
 
-class PointSetDecodingError(Exception):
-    """Levée quand un buffer binaire de PointSet est malformé, tronqué ou incohérent."""
+def encode_point_set(points: list[Point]) -> bytes:
+    """Encode une liste de points vers le format binaire PointSet."""
+    raise NotImplementedError
 
 
-@dataclass(frozen=True)
-class PointSet:
-    """Un ensemble ordonné de points 2D."""
-
-    points: tuple[tuple[float, float], ...]
-
-    def encode(self) -> bytes:
-        """Encode ce PointSet vers sa représentation binaire."""
-        raise NotImplementedError
-
-    @staticmethod
-    def decode(data: bytes) -> PointSet:
-        """Décode un PointSet depuis sa représentation binaire."""
-        raise NotImplementedError
+def decode_point_set(data: bytes) -> list[Point]:
+    """Décode un buffer binaire PointSet. Lève ValueError si le buffer est invalide."""
+    raise NotImplementedError

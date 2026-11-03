@@ -1,16 +1,14 @@
 """Expose l'API HTTP du Triangulator décrite dans `api/triangulator.yml`."""
 
+from collections.abc import Callable
+
 from flask import Flask
 
-from triangulator.point_set_manager_client import PointSetManagerClient
+FetchPointSet = Callable[[str], tuple[int, bytes]]
 
 
-class InvalidPointSetIdError(Exception):
-    """Levée quand le paramètre pointSetId de l'URL n'est pas un UUID valide."""
-
-
-def create_app(point_set_manager_client: PointSetManagerClient) -> Flask:
-    """Construit l'app Flask du Triangulator, connectée au client PointSetManager."""
+def create_app(fetch_point_set: FetchPointSet) -> Flask:
+    """Construit l'app Flask, reliée à fetch_point_set pour obtenir les PointSets."""
     app = Flask(__name__)
 
     @app.get("/triangulation/<point_set_id>")

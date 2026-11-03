@@ -1,4 +1,4 @@
-"""Représente un résultat de triangulation, encodable en binaire.
+"""Encode/décode le format binaire Triangles (voir PLAN.md, section 2).
 
 Format binaire :
 - Les sommets, encodés exactement comme un PointSet.
@@ -7,29 +7,20 @@ Format binaire :
   little-endian référençant des indices de sommets.
 """
 
-from __future__ import annotations
+from triangulator.point_set import Point
 
-from dataclasses import dataclass
-
-from triangulator.point_set import PointSet
+Triangle = tuple[int, int, int]
 
 
-class InvalidTriangleIndexError(Exception):
-    """Levée quand un triangle référence un indice de sommet hors de son PointSet."""
+def encode_triangles(points: list[Point], triangles: list[Triangle]) -> bytes:
+    """Encode des sommets et des triangles vers le format binaire Triangles.
+
+    Lève ValueError si un triangle référence un indice de sommet absent
+    de points.
+    """
+    raise NotImplementedError
 
 
-@dataclass(frozen=True)
-class Triangles:
-    """Un ensemble de sommets plus les triangles qui les relient, en triplets."""
-
-    vertices: PointSet
-    triangle_indices: tuple[tuple[int, int, int], ...]
-
-    def encode(self) -> bytes:
-        """Encode ce Triangles vers sa représentation binaire."""
-        raise NotImplementedError
-
-    @staticmethod
-    def decode(data: bytes) -> Triangles:
-        """Décode un Triangles depuis sa représentation binaire."""
-        raise NotImplementedError
+def decode_triangles(data: bytes) -> tuple[list[Point], list[Triangle]]:
+    """Décode un buffer binaire Triangles. Lève ValueError si invalide."""
+    raise NotImplementedError

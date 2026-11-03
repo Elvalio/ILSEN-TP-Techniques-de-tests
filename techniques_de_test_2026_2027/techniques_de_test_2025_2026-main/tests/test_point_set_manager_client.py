@@ -1,34 +1,39 @@
-"""Tests pour PointSetManagerClient, avec urlopen mocké (voir PLAN.md, section 4).
+"""Tests pour fetch_point_set, avec urlopen mocké (voir PLAN.md, section 4).
 
 On patche urllib.request.urlopen directement : l'implémentation doit donc
-l'appeler via `urllib.request.urlopen(...)`, pas via un import direct
-(`from urllib.request import urlopen`), sinon le mock ne prend pas la main.
+l'appeler via `urllib.request.urlopen(...)` (`import urllib.request`, pas
+`from urllib.request import urlopen`) pour que le patch s'applique.
 """
 
 import io
 import struct
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 from urllib.error import HTTPError, URLError
 
 import pytest
 
-from triangulator.point_set import PointSetDecodingError
-from triangulator.point_set_manager_client import (
-    PointSetManagerClient,
-    PointSetManagerUnavailableError,
-    PointSetNotFoundError,
-)
+from triangulator.point_set_manager_client import fetch_point_set
 
 POINT_SET_ID = "123e4567-e89b-12d3-a456-426614174000"
 BASE_URL = "http://point-set-manager.example"
 
 
 def _pack_points(points):
-    """Construit un buffer PointSet à la main, sans passer par encode()."""
+    """Construit un buffer PointSet à la main."""
     data = struct.pack("<L", len(points))
     for x, y in points:
         data += struct.pack("<ff", x, y)
     return data
+
+
+def _fake_response(status, body):
+    """Construit un faux objet réponse HTTP, comme celui que renvoie urlopen()."""
+    response = Mock()
+    response.status = status
+    response.read.return_value = body
+    response.__enter__ = Mock(return_value=response)
+    response.__exit__ = Mock(return_value=False)
+    return response
 
 
 @pytest.fixture
@@ -38,67 +43,57 @@ def mock_urlopen():
         yield mock
 
 
-def test_get_point_set_calls_the_expected_url(mock_urlopen):
+def test_fetch_point_set_calls_the_expected_url(mock_urlopen):
     """La requête doit partir sur /pointset/{id}, avec le bon id."""
-    mock_urlopen.return_value = io.BytesIO(_pack_points([(1.0, 2.0)]))
-    client = PointSetManagerClient(base_url=BASE_URL)
+    mock_urlopen.return_value = _fake_response(200, _pack_points([(1.0, 2.0)]))
 
-    client.get_point_set(POINT_SET_ID)
+    fetch_point_set(BASE_URL, POINT_SET_ID)
 
     called_url = mock_urlopen.call_args[0][0]
     assert called_url == f"{BASE_URL}/pointset/{POINT_SET_ID}"
 
 
-def test_get_point_set_returns_the_decoded_point_set(mock_urlopen):
-    """Le PointSet renvoyé doit correspondre à ce que urlopen a répondu."""
-    mock_urlopen.return_value = io.BytesIO(_pack_points([(1.0, 2.0)]))
-    client = PointSetManagerClient(base_url=BASE_URL)
+def test_fetch_point_set_returns_status_and_body(mock_urlopen):
+    """La fonction doit renvoyer (200, le corps reçu) en cas de succès."""
+    body = _pack_points([(1.0, 2.0)])
+    mock_urlopen.return_value = _fake_response(200, body)
 
-    point_set = client.get_point_set(POINT_SET_ID)
-
-    assert point_set.points == ((1.0, 2.0),)
+    assert fetch_point_set(BASE_URL, POINT_SET_ID) == (200, body)
 
 
-def test_unknown_id_raises_not_found(mock_urlopen):
-    """Un 404 du PointSetManager doit devenir un PointSetNotFoundError."""
-    mock_urlopen.side_effect = HTTPError(BASE_URL, 404, "Not Found", None, None)
-    client = PointSetManagerClient(base_url=BASE_URL)
+def test_fetch_point_set_returns_404_status(mock_urlopen):
+    """Un 404 du PointSetManager doit être renvoyé tel quel, pas levé en exception."""
+    mock_urlopen.side_effect = HTTPError(
+        BASE_URL, 404, "Not Found", None, io.BytesIO(b"")
+    )
 
-    with pytest.raises(PointSetNotFoundError):
-        client.get_point_set(POINT_SET_ID)
+    status, _ = fetch_point_set(BASE_URL, POINT_SET_ID)
+
+    assert status == 404
 
 
-def test_unreachable_service_raises_unavailable(mock_urlopen):
-    """Si la connexion échoue, on doit avoir un PointSetManagerUnavailableError."""
+def test_fetch_point_set_returns_500_status(mock_urlopen):
+    """Un 500 (erreur interne du PointSetManager) doit aussi être renvoyé tel quel."""
+    mock_urlopen.side_effect = HTTPError(
+        BASE_URL, 500, "Internal Server Error", None, io.BytesIO(b"")
+    )
+
+    status, _ = fetch_point_set(BASE_URL, POINT_SET_ID)
+
+    assert status == 500
+
+
+def test_unreachable_service_raises_oserror(mock_urlopen):
+    """Si la connexion échoue, l'erreur réseau doit remonter telle quelle."""
     mock_urlopen.side_effect = URLError(ConnectionRefusedError())
-    client = PointSetManagerClient(base_url=BASE_URL)
 
-    with pytest.raises(PointSetManagerUnavailableError):
-        client.get_point_set(POINT_SET_ID)
+    with pytest.raises(OSError):
+        fetch_point_set(BASE_URL, POINT_SET_ID)
 
 
-def test_timeout_raises_unavailable(mock_urlopen):
+def test_timeout_raises_oserror(mock_urlopen):
     """Même chose si la requête dépasse le timeout."""
     mock_urlopen.side_effect = TimeoutError()
-    client = PointSetManagerClient(base_url=BASE_URL, timeout=0.2)
 
-    with pytest.raises(PointSetManagerUnavailableError):
-        client.get_point_set(POINT_SET_ID)
-
-
-def test_corrupted_response_body_raises_point_set_decoding_error(mock_urlopen):
-    """Un corps de réponse illisible doit lever PointSetDecodingError."""
-    mock_urlopen.return_value = io.BytesIO(b"\x03\x00\x00\x00")
-    client = PointSetManagerClient(base_url=BASE_URL)
-
-    with pytest.raises(PointSetDecodingError):
-        client.get_point_set(POINT_SET_ID)
-
-
-def test_unexpected_400_response_raises_unavailable(mock_urlopen):
-    """Un 400 inattendu (cas documenté dans PLAN.md) est traité comme indisponible."""
-    mock_urlopen.side_effect = HTTPError(BASE_URL, 400, "Bad Request", None, None)
-    client = PointSetManagerClient(base_url=BASE_URL)
-
-    with pytest.raises(PointSetManagerUnavailableError):
-        client.get_point_set(POINT_SET_ID)
+    with pytest.raises(OSError):
+        fetch_point_set(BASE_URL, POINT_SET_ID, timeout=0.2)

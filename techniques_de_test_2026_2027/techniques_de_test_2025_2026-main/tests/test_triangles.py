@@ -1,15 +1,14 @@
-"""Tests unitaires pour `triangulator.triangles.Triangles` (voir PLAN.md, section 2)."""
+"""Tests unitaires pour l'encodage/décodage de Triangles (voir PLAN.md, section 2)."""
 
 import struct
 
 import pytest
 
-from triangulator.point_set import PointSet
-from triangulator.triangles import InvalidTriangleIndexError, Triangles
+from triangulator.triangles import decode_triangles, encode_triangles
 
 
 def _pack_points(points):
-    """Construit un buffer PointSet à la main, sans passer par encode()."""
+    """Construit un buffer PointSet à la main, sans passer par encode_point_set()."""
     data = struct.pack("<L", len(points))
     for x, y in points:
         data += struct.pack("<ff", x, y)
@@ -26,30 +25,31 @@ def _pack_triangles(points, triangle_indices):
 
 
 def test_round_trip_preserves_vertices_and_triangles():
-    """Teste qu'encoder puis décoder un Triangles préserve sommets et triangles."""
-    vertices = PointSet(points=((0.0, 0.0), (1.0, 0.0), (0.0, 1.0)))
-    triangle_indices = ((0, 1, 2),)
-    triangles = Triangles(vertices=vertices, triangle_indices=triangle_indices)
+    """Teste qu'encoder puis décoder des triangles préserve sommets et triangles."""
+    points = [(0.0, 0.0), (1.0, 0.0), (0.0, 1.0)]
+    triangle_indices = [(0, 1, 2)]
 
-    decoded = Triangles.decode(triangles.encode())
+    decoded_points, decoded_triangles = decode_triangles(
+        encode_triangles(points, triangle_indices)
+    )
 
-    assert decoded.vertices.points == vertices.points
-    assert decoded.triangle_indices == triangle_indices
+    assert decoded_points == points
+    assert decoded_triangles == triangle_indices
 
 
 def test_decode_with_no_triangles_returns_empty_triangle_list():
     """Teste que des sommets avec 0 triangle se décodent en une liste vide."""
     points = [(0.0, 0.0), (1.0, 0.0), (0.0, 1.0)]
 
-    decoded = Triangles.decode(_pack_triangles(points, []))
+    decoded_points, decoded_triangles = decode_triangles(_pack_triangles(points, []))
 
-    assert decoded.vertices.points == tuple(points)
-    assert decoded.triangle_indices == ()
+    assert decoded_points == points
+    assert decoded_triangles == []
 
 
 def test_triangle_referencing_unknown_vertex_index_raises():
     """Teste qu'un indice de triangle hors de la liste des sommets est rejeté."""
-    vertices = PointSet(points=((0.0, 0.0), (1.0, 0.0), (0.0, 1.0)))
+    points = [(0.0, 0.0), (1.0, 0.0), (0.0, 1.0)]
 
-    with pytest.raises(InvalidTriangleIndexError):
-        Triangles(vertices=vertices, triangle_indices=((0, 1, 5),))
+    with pytest.raises(ValueError):
+        encode_triangles(points, [(0, 1, 5)])
